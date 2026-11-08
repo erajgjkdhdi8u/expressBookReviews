@@ -1,43 +1,73 @@
 const express = require('express');
-let books = require("./booksdb.js");
-let isValid = require("./auth_users.js").isValid;
-let users = require("./auth_users.js").users;
+const axios = require('axios');
+const books = require('./booksdb.js');
+const { isValid, users } = require('./auth_users.js');
 const public_users = express.Router();
 
-
-public_users.post("/register", (req,res) => {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+public_users.post('/register', (req, res) => {
+  const { username, password } = req.body;
+  if (typeof username !== 'string' || !username.trim() ||
+      typeof password !== 'string' || !password.trim()) {
+    return res.status(400).json({ message: 'Username and password are required' });
+  }
+  if (isValid(username)) return res.status(409).json({ message: 'Username already exists' });
+  users.push({ username, password });
+  return res.status(201).json({ message: 'User successfully registered' });
 });
 
-// Get the book list available in the shop
-public_users.get('/',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+// Public catalogue endpoints. ISBN values are the keys in booksdb.js.
+public_users.get('/', (req, res) => res.json(books));
+
+public_users.get('/isbn/:isbn', (req, res) => {
+  const book = books[req.params.isbn];
+  return book ? res.json(book) : res.status(404).json({ message: 'Book not found' });
 });
 
-// Get book details based on ISBN
-public_users.get('/isbn/:isbn',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
- });
-  
-// Get book details based on author
-public_users.get('/author/:author',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+public_users.get('/author/:author', (req, res) => {
+  const author = req.params.author.toLowerCase();
+  const matching = Object.fromEntries(Object.entries(books).filter(
+    ([, book]) => book.author.toLowerCase() === author
+  ));
+  return Object.keys(matching).length ? res.json(matching) :
+    res.status(404).json({ message: 'No books found for this author' });
 });
 
-// Get all books based on title
-public_users.get('/title/:title',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+public_users.get('/title/:title', (req, res) => {
+  const title = req.params.title.toLowerCase();
+  const matching = Object.fromEntries(Object.entries(books).filter(
+    ([, book]) => book.title.toLowerCase() === title
+  ));
+  return Object.keys(matching).length ? res.json(matching) :
+    res.status(404).json({ message: 'No books found for this title' });
 });
 
-//  Get book review
-public_users.get('/review/:isbn',function (req, res) {
-  //Write your code here
-  return res.status(300).json({message: "Yet to be implemented"});
+public_users.get('/review/:isbn', (req, res) => {
+  const book = books[req.params.isbn];
+  return book ? res.json(book.reviews) : res.status(404).json({ message: 'Book not found' });
 });
+
+// Async/Await + Axios implementations for the final project tasks.
+// Start the server first: npm start; then run: node axios_demo.js
+const API = process.env.BOOKSHOP_API_URL || 'http://127.0.0.1:5000';
+async function getAllBooks() {
+  const response = await axios.get(API + '/');
+  return response.data;
+}
+async function getBookByISBN(isbn) {
+  const response = await axios.get(API + '/isbn/' + encodeURIComponent(isbn));
+  return response.data;
+}
+async function getBooksByAuthor(author) {
+  const response = await axios.get(API + '/author/' + encodeURIComponent(author));
+  return response.data;
+}
+async function getBooksByTitle(title) {
+  const response = await axios.get(API + '/title/' + encodeURIComponent(title));
+  return response.data;
+}
 
 module.exports.general = public_users;
+module.exports.getAllBooks = getAllBooks;
+module.exports.getBookByISBN = getBookByISBN;
+module.exports.getBooksByAuthor = getBooksByAuthor;
+module.exports.getBooksByTitle = getBooksByTitle;
